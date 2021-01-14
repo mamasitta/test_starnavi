@@ -8,28 +8,19 @@ import requests
 from django.shortcuts import render
 from django.http import HttpResponse
 # Create your views here.
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from simple_api.helpers.helpers import get_user_id_from_jwt
 from simple_api.serializers import PostSerializer, PostLikeSerializer, PostDislikeSerializer, UserActivitySerializer
 from .models import Post_dislike, Post_like, Post, User_activity
 
 from test_starnavi import settings
 
 
-@api_view(['GET'])
-def index(request):
-    if "Authorization" in request.headers:
-        t = request.headers['Authorization']
-        token = str.replace(str(t), 'Bearer ', '')
-        payload = jwt.decode(jwt=token, key=settings.SECRET_KEY, algorithms=['HS256'])
-        content = {"massage": "hello {}".format(payload['user_id'])}
-        return Response(content, status=status.HTTP_200_OK)
-    else:
-        content = {"error": "no jwt"}
-        return Response(content, status=status.HTTP_401_UNAUTHORIZED)
 
 
 @api_view(['POST'])
@@ -105,9 +96,7 @@ def login_view(request):
 def create_post(request):
     if "Authorization" in request.headers:
         # getting user_id from jwt token
-        t = request.headers['Authorization']
-        token = str.replace(str(t), 'Bearer ', '')
-        payload = jwt.decode(jwt=token, key=settings.SECRET_KEY, algorithms=['HS256'])
+        user_id = get_user_id_from_jwt(request.headers['Authorization'])
         data = request.data
         # checking all data from request
         if 'title' in data and data['title'] is not None and len(data['title']) > 0:
@@ -121,10 +110,10 @@ def create_post(request):
             content = {'error': "No post"}
             return Response(content, status=status.HTTP_400_BAD_REQUEST)
         # add data to db and return details
-        new_post = Post(user_id=payload['user_id'], title=title, post=post, date_created=datetime.datetime.now())
+        new_post = Post(user_id=user_id, title=title, post=post, date_created=datetime.datetime.now())
         new_post.save()
-        user_activity = User_activity.objects.filter(user_id=payload['user_id']).update(date=datetime.datetime.now())
-        post_created = Post.objects.filter(user_id=payload['user_id'], title=title, post=post)
+        user_activity = User_activity.objects.filter(user_id=user_id).update(date=timezone.now())
+        post_created = Post.objects.filter(user_id=user_id, title=title, post=post)
         serializer = PostSerializer(post_created, many=True)
         return Response(serializer.data)
     else:
@@ -137,9 +126,7 @@ def create_post(request):
 def post_like_save(request):
     if "Authorization" in request.headers:
         # getting user_id from jwt token
-        t = request.headers['Authorization']
-        token = str.replace(str(t), 'Bearer ', '')
-        payload = jwt.decode(jwt=token, key=settings.SECRET_KEY, algorithms=['HS256'])
+        user_id = get_user_id_from_jwt(request.headers['Authorization'])
         data = request.data
         # checking data from request
         if 'post_id' in data and data['post_id'] is not None:
@@ -148,9 +135,9 @@ def post_like_save(request):
             content = {'error': "No post_id"}
             return Response(content, status=status.HTTP_400_BAD_REQUEST)
         # saving like to db and returning post with likes and dislikes
-        new_like = Post_like(post_id=post_id, user_id=payload['user_id'], date=datetime.datetime.now())
+        new_like = Post_like(post_id=post_id, user_id=user_id, date=datetime.datetime.now())
         new_like.save()
-        user_activity = User_activity.objects.filter(user_id=payload['user_id']).update(date=datetime.datetime.now())
+        user_activity = User_activity.objects.filter(user_id=user_id).update(date=timezone.now())
         post = Post.objects.get(id=post_id)
         serializer = PostSerializer(post)
         return Response(serializer.data)
@@ -164,9 +151,7 @@ def post_like_save(request):
 def post_dislike_save(request):
     if "Authorization" in request.headers:
         # getting user_id from jwt token
-        t = request.headers['Authorization']
-        token = str.replace(str(t), 'Bearer ', '')
-        payload = jwt.decode(jwt=token, key=settings.SECRET_KEY, algorithms=['HS256'])
+        user_id = get_user_id_from_jwt(request.headers['Authorization'])
         data = request.data
         # checking data from request
         if 'post_id' in data and data['post_id'] is not None:
@@ -175,9 +160,9 @@ def post_dislike_save(request):
             content = {'error': "No post_id"}
             return Response(content, status=status.HTTP_400_BAD_REQUEST)
         # saving dislike and returning post with likes and dislikes
-        new_dislike = Post_dislike(post_id=post_id, user_id=payload['user_id'], date=datetime.datetime.now())
+        new_dislike = Post_dislike(post_id=post_id, user_id=user_id, date=datetime.datetime.now())
         new_dislike.save()
-        user_activity = User_activity.objects.filter(user_id=payload['user_id']).update(date=datetime.datetime.now())
+        user_activity = User_activity.objects.filter(user_id=user_id).update(date=timezone.now())
         post = Post.objects.get(id=post_id)
         serializer = PostSerializer(post)
         return Response(serializer.data)
@@ -192,10 +177,8 @@ def post_dislike_save(request):
 def analytics(request):
     if "Authorization" in request.headers:
         # getting user_id from jwt token
-        t = request.headers['Authorization']
-        token = str.replace(str(t), 'Bearer ', '')
-        payload = jwt.decode(jwt=token, key=settings.SECRET_KEY, algorithms=['HS256'])
-        user_activity = User_activity.objects.filter(user_id=payload['user_id']).update(date=datetime.datetime.now())
+        user_id = get_user_id_from_jwt(request.headers['Authorization'])
+        user_activity = User_activity.objects.filter(user_id=user_id).update(date=timezone.now())
         # getting data from request
         try:
             date_from = request.GET['date_from']
@@ -220,10 +203,8 @@ def analytics(request):
 def get_all_posts(request):
     if "Authorization" in request.headers:
         # getting user_id from jwt token
-        t = request.headers['Authorization']
-        token = str.replace(str(t), 'Bearer ', '')
-        payload = jwt.decode(jwt=token, key=settings.SECRET_KEY, algorithms=['HS256'])
-        user_activity = User_activity.objects.filter(user_id=payload['user_id']).update(date=datetime.datetime.now())
+        user_id = get_user_id_from_jwt(request.headers['Authorization'])
+        user_activity = User_activity.objects.filter(user_id=user_id).update(date=timezone.now())
         posts = Post.objects.all()
         serializer = PostSerializer(posts, many=True)
         return Response(serializer.data)
@@ -236,10 +217,8 @@ def get_all_posts(request):
 def user_activity(request):
     if "Authorization" in request.headers:
         # getting user_id from jwt token
-        t = request.headers['Authorization']
-        token = str.replace(str(t), 'Bearer ', '')
-        payload = jwt.decode(jwt=token, key=settings.SECRET_KEY, algorithms=['HS256'])
-        user_activity = User_activity.objects.filter(user_id=payload['user_id']).update(date=datetime.datetime.now())
+        user_id = get_user_id_from_jwt(request.headers['Authorization'])
+        user_activity = User_activity.objects.filter(user_id=user_id).update(date=timezone.now())
         # request with username
         if "username" in request.GET:
             user = User.objects.filter(username=request.GET['username'])
